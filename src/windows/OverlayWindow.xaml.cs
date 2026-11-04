@@ -49,6 +49,20 @@ namespace LiveCaptionsTranslator
         private string lastLiveTranslationKey = string.Empty;
         private string lastLiveOriginalKey = string.Empty;
         private readonly TranslateTransform committedShift = new();
+        private int translationLines = 1;
+        private int originalLines = 1;
+        private double lastTranslationHeight = double.NaN;
+        private double lastOriginalHeight = double.NaN;
+
+        private static void SetHeightSmooth(FrameworkElement element, ref double lastTarget, double target)
+        {
+            if (double.IsNaN(lastTarget))
+                element.Height = target;
+            else if (Math.Abs(lastTarget - target) > 0.5)
+                element.BeginAnimation(FrameworkElement.HeightProperty, new DoubleAnimation(target,
+                    TimeSpan.FromMilliseconds(180)) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } });
+            lastTarget = target;
+        }
 
         public CaptionVisible OnlyMode
         {
@@ -498,8 +512,9 @@ namespace LiveCaptionsTranslator
         /// Overlay layout, top to bottom:
         /// (1) finished sentences, one translation/original pair each, anchored to the bottom of their area and
         ///     sliding up when a sentence is added;
-        /// (2) a live slot of fixed height for the sentence being spoken: its provisional translation (2 lines) and
-        ///     its original text (2 lines, the least stable last words drawn fainter).
+        /// (2) a live slot for the sentence being spoken: its provisional translation and its original text, one
+        ///     line each at rest, growing to at most LIVE_LINES lines (never shrinking within a sentence); the least
+        ///     stable last words of the original are drawn fainter.
         /// </summary>
         private void RenderCaption()
         {
@@ -608,21 +623,32 @@ namespace LiveCaptionsTranslator
 
             // ---------------- (2) live slot ----------------
             bool liveActive = live.Length > 0 && !(liveIsCurrent && currentFinal);
+            string previousShown = shownLive;
             shownLive = StabilizeLive(shownLive, liveActive ? live : string.Empty);
+
+            // The live slot is one line per text at rest and may grow to LIVE_LINES while a sentence is spoken.
+            // It only grows during a sentence (no jumping back and forth) and shrinks when a new sentence starts.
+            if (shownLive.Length == 0 || !IsSameSentence(previousShown, shownLive))
+            {
+                translationLines = 1;
+                originalLines = 1;
+            }
 
             LiveTranslationDecorator.Visibility = showTranslation ? Visibility.Visible : Visibility.Collapsed;
             OriginalCaptionDecorator.Visibility = showOriginal ? Visibility.Visible : Visibility.Collapsed;
-            LiveTranslation.Height = Math.Ceiling(MeasureText("Ag", translationSize).Height * LIVE_LINES) + 2;
-            OriginalCaption.Height = Math.Ceiling(MeasureText("Ag", originalSize).Height * LIVE_LINES) + 2;
+            double translationLineHeight = MeasureText("Ag", translationSize).Height;
+            double originalLineHeight = MeasureText("Ag", originalSize).Height;
+            int NeededLines(string text, double size, double lineHeight) =>
+                text.Length == 0 ? 1 : Math.Clamp((int)Math.Ceiling(MeasureText(text, size).Height / lineHeight - 0.05), 1, LIVE_LINES);
 
-            // The window must always have room for the whole live slot plus at least one finished pair,
-            // otherwise a small saved size cuts the live slot and the hover buttons cover it.
+            // The window must always have room for the live slot at rest plus at least one finished pair,
+            // otherwise a small saved size cuts the live slot.
             const double CARD_CHROME = 20;      // card padding 8+8 and margin 2+2
             const double BORDER_CHROME = 10;    // outer border margin 5+5
-            double liveHeight = (showTranslation ? LiveTranslation.Height : 0) + (showOriginal ? OriginalCaption.Height : 0);
-            double pairHeight = (showTranslation ? MeasureText("Ag", translationSize).Height : 0) +
-                                (showOriginal ? MeasureText("Ag", originalSize).Height : 0);
-            double wantedMinHeight = Math.Ceiling(liveHeight + CARD_CHROME + pairHeight + CARD_CHROME + BORDER_CHROME);
+            double restHeight = (showTranslation ? Math.Ceiling(translationLineHeight) + 2 : 0) +
+                                (showOriginal ? Math.Ceiling(originalLineHeight) + 2 : 0);
+            double pairHeight = (showTranslation ? translationLineHeight : 0) + (showOriginal ? originalLineHeight : 0);
+            double wantedMinHeight = Math.Ceiling(restHeight + CARD_CHROME + pairHeight + CARD_CHROME + BORDER_CHROME);
             if (Math.Abs(MinHeight - wantedMinHeight) > 1)
                 MinHeight = Math.Max(135, wantedMinHeight);
 
@@ -635,10 +661,13 @@ namespace LiveCaptionsTranslator
                 if (provisional.Length > 0 && source.Length > 0 && IsSameSentence(shownLive, source))
                 {
                     var (words, trimmed) = FitTail(provisional, translationSize, LIVE_LINES);
-                    translationSegments.Add(((trimmed ? "... " : "") + string.Join(" ", words), translationSize,
-                        translationWeight, 0.7, null));
+                    string text = (trimmed ? "... " : "") + string.Join(" ", words);
+                    translationLines = Math.Max(translationLines, NeededLines(text, translationSize, translationLineHeight));
+                    translationSegments.Add((text, translationSize, translationWeight, 0.85, null));
                 }
             }
+            SetHeightSmooth(LiveTranslation, ref lastTranslationHeight,
+                Math.Ceiling(translationLineHeight * translationLines) + 2);
             string liveTranslationKey = SegmentsKey(translationSegments, color);
             if (liveTranslationKey != lastLiveTranslationKey)
             {
@@ -660,6 +689,8 @@ namespace LiveCaptionsTranslator
             if (showOriginal && shownLive.Length > 0)
             {
                 var (words, trimmed) = FitTail(shownLive, originalSize, LIVE_LINES);
+                originalLines = Math.Max(originalLines, NeededLines(
+                    (trimmed ? "... " : "") + string.Join(" ", words), originalSize, originalLineHeight));
                 int tailCount = Math.Min(MASK_K, words.Count);
                 string stable = (trimmed ? "... " : "") + string.Join(" ", words.Take(words.Count - tailCount));
                 if (words.Count > tailCount)
@@ -667,10 +698,11 @@ namespace LiveCaptionsTranslator
                 else if (trimmed)
                     stable = "... ";
                 if (stable.Trim().Length > 0)
-                    originalSegments.Add((stable, originalSize, FontWeights.Regular, 0.5, null));
+                    originalSegments.Add((stable, originalSize, FontWeights.Regular, 0.8, null));
                 originalSegments.Add((string.Join(" ", words.Skip(words.Count - tailCount)), originalSize,
-                    FontWeights.Regular, 0.28, null));
+                    FontWeights.Regular, 0.5, null));
             }
+            SetHeightSmooth(OriginalCaption, ref lastOriginalHeight, Math.Ceiling(originalLineHeight * originalLines) + 2);
             string liveOriginalKey = SegmentsKey(originalSegments, color);
             if (liveOriginalKey != lastLiveOriginalKey)
             {

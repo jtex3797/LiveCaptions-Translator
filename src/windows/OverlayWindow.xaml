@@ -1,4 +1,4 @@
-﻿<!-- Modified by jtex3797 (2026-11): fixed-height live slot, bottom-anchored finished sentences. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0). -->
+﻿<!-- Modified by jtex3797 (2026-11): compact live slot, bottom-anchored finished sentences. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0). -->
 <Window
     x:Class="LiveCaptionsTranslator.OverlayWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"

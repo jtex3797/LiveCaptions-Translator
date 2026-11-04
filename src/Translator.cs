@@ -224,10 +224,10 @@ namespace LiveCaptionsTranslator
         public static async Task LiveTranslateLoop()
         {
             const int POLL_MS = 250;
-            const int MIN_WORDS = 3;
-            const int MIN_NEW_WORDS = 3;
+            const int MIN_WORDS = 2;
+            const int MIN_NEW_WORDS = 2;
             const int MIN_INTERVAL_MS = 900;
-            const int MAX_WAIT_MS = 2000;
+            const int MAX_WAIT_MS = 1500;
 
             string previousHypothesis = string.Empty;
             string requestedSource = string.Empty;
@@ -305,6 +305,9 @@ namespace LiveCaptionsTranslator
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
                     string translated = await TranslateAPI.TranslateFunction(source, cts.Token);
                     translated = (translated ?? string.Empty).Replace("🔤", "").Trim();
+                    // The API wrappers report failures as "[ERROR] ..." text instead of throwing.
+                    if (translated.Contains("[ERROR]") || translated.Contains("[WARNING]"))
+                        throw new InvalidOperationException("provisional translation failed");
                     failures = 0;
 
                     // Drop the result if the sentence has moved on in the meantime.

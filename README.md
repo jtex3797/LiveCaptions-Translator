@@ -30,7 +30,7 @@ The goal of this fork is **readability** when following a meeting or a video in 
 
 - **Translate on sentence end** - a sentence is translated once it is finished (or after a pause) instead of on every caption update, so the translation stops flickering.
 - **Sentence pairs in the overlay** - several finished sentences are shown as *translation, then original*, newest at the bottom; older ones scroll up and fade out at the top.
-- **Fixed-height live slot** - the sentence being spoken has its own slot with a fixed size (2 lines translation + 2 lines original). The last two words of the original are dimmed because the recognizer revises them most often, and the provisional translation fades in instead of jumping.
+- **Compact live slot** - the sentence being spoken has its own slot at the bottom: one line of translation and one line of original at rest, growing to at most two lines each during a sentence (it never shrinks back and forth within a sentence). The last two words of the original are dimmed because the recognizer revises them most often, and the provisional translation fades in instead of jumping.
 - **Provisional translation (experimental)** - only the beginning of the sentence that stayed unchanged between two consecutive polls is translated, at a limited rate. It is shown in the overlay only and is never written to the history.
 - **Home page log cards** - one card per sentence (translation, then original) in a scrollable page.
 - **Overlay minimum height** follows the font size so the live slot is never cut off, and the hover buttons sit at the top right.
