@@ -1,4 +1,5 @@
-﻿<Window
+﻿<!-- Modified by jtex3797 (2026-11): fixed-height live slot, bottom-anchored finished sentences. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0). -->
+<Window
     x:Class="LiveCaptionsTranslator.OverlayWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -8,7 +9,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="Overlay Window"
     Width="650"
-    Height="135"
+    Height="320"
     MinWidth="650"
     MinHeight="135"
     AllowsTransparency="True"
@@ -19,7 +20,6 @@
     ShowInTaskbar="False"
     Topmost="True"
     WindowStyle="None"
-    SizeToContent="Height"
     mc:Ignorable="d">
 
     <Window.Resources>
@@ -40,8 +40,8 @@
             MouseLeftButtonDown="Border_MouseLeftButtonDown">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.Resources>
                     <Style x:Key="CaptionBlockStyle" TargetType="TextBlock">
@@ -50,55 +50,75 @@
                     </Style>
                 </Grid.Resources>
 
-                <ui:Card
-                    x:Name="TranslatedCaptionCard"
+                <!-- Finished sentences. Anchored to the bottom: older ones scroll up and fade out at the top. -->
+                <Grid
+                    x:Name="CommittedHost"
                     Grid.Row="0"
-                    Margin="5,2,5,2"
-                    Padding="8"
-                    VerticalAlignment="Top"
-                    Background="Transparent"
-                    BorderThickness="0">
-                    <local:StrokeDecorator
-                        x:Name="TranslatedCaptionDecorator"
-                        Stroke="Black"
-                        StrokeThickness="0">
-                        <TextBlock
-                            x:Name="TranslatedCaption"
-                            FontSize="18"
-                            Style="{StaticResource CaptionBlockStyle}">
-                            <Run x:Name="NoticePrefixRun" Text="{Binding OverlayNoticePrefix, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" />
-                            <Run x:Name="PreviousTranslationRun" Text="{Binding OverlayPreviousTranslation, Mode=OneWay}" />
-                            <Run x:Name="CurrentTranslationRun" Text="{Binding OverlayCurrentTranslation, UpdateSourceTrigger=PropertyChanged}" />
-                        </TextBlock>
-                    </local:StrokeDecorator>
-                </ui:Card>
+                    ClipToBounds="True">
+                    <Grid.OpacityMask>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Offset="0" Color="#00000000" />
+                            <GradientStop Offset="0.08" Color="#FF000000" />
+                            <GradientStop Offset="1" Color="#FF000000" />
+                        </LinearGradientBrush>
+                    </Grid.OpacityMask>
+                    <ui:Card
+                        x:Name="TranslatedCaptionCard"
+                        Margin="5,2,5,2"
+                        Padding="8"
+                        VerticalAlignment="Top"
+                        Background="Transparent"
+                        BorderThickness="0">
+                        <local:StrokeDecorator
+                            x:Name="TranslatedCaptionDecorator"
+                            Stroke="Black"
+                            StrokeThickness="0">
+                            <!-- Filled in code (OverlayWindow.RenderCaption): one translation/original pair per sentence. -->
+                            <TextBlock
+                                x:Name="TranslatedCaption"
+                                FontSize="18"
+                                Style="{StaticResource CaptionBlockStyle}" />
+                        </local:StrokeDecorator>
+                    </ui:Card>
+                </Grid>
+
+                <!-- Live slot: the sentence being spoken. Fixed height (set in code), provisional translation + original. -->
                 <ui:Card
                     x:Name="OriginalCaptionCard"
                     Grid.Row="1"
                     Margin="5,2,5,2"
                     Padding="8"
-                    VerticalAlignment="Top"
+                    VerticalAlignment="Bottom"
                     Background="Transparent"
                     BorderThickness="0">
-                    <local:StrokeDecorator
-                        x:Name="OriginalCaptionDecorator"
-                        Stroke="Black"
-                        StrokeThickness="0">
-                        <TextBlock
-                            x:Name="OriginalCaption"
-                            FontSize="15"
-                            Style="{StaticResource CaptionBlockStyle}"
-                            Text="{Binding OverlayOriginalCaption, UpdateSourceTrigger=PropertyChanged}">
-                        </TextBlock>
-                    </local:StrokeDecorator>
+                    <StackPanel x:Name="LiveStack">
+                        <local:StrokeDecorator
+                            x:Name="LiveTranslationDecorator"
+                            Stroke="Black"
+                            StrokeThickness="0">
+                            <TextBlock
+                                x:Name="LiveTranslation"
+                                FontSize="18"
+                                Style="{StaticResource CaptionBlockStyle}" />
+                        </local:StrokeDecorator>
+                        <local:StrokeDecorator
+                            x:Name="OriginalCaptionDecorator"
+                            Stroke="Black"
+                            StrokeThickness="0">
+                            <TextBlock
+                                x:Name="OriginalCaption"
+                                FontSize="15"
+                                Style="{StaticResource CaptionBlockStyle}" />
+                        </local:StrokeDecorator>
+                    </StackPanel>
                 </ui:Card>
 
                 <StackPanel
                     x:Name="ControlPanel"
-                    Grid.Row="1"
-                    Margin="0,0,5,5"
+                    Grid.Row="0"
+                    Margin="0,5,5,0"
                     HorizontalAlignment="Right"
-                    VerticalAlignment="Bottom"
+                    VerticalAlignment="Top"
                     Orientation="Horizontal">
                     <ui:Button
                         x:Name="FontSizeIncrease"

@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿// Modified by jtex3797 (2026-11): start the provisional live translation loop. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+using System.Windows;
 
 using LiveCaptionsTranslator.utils;
 
@@ -14,6 +15,7 @@ namespace LiveCaptionsTranslator
             Task.Run(() => Translator.SyncLoop());
             Task.Run(() => Translator.TranslateLoop());
             Task.Run(() => Translator.DisplayLoop());
+            Task.Run(() => Translator.LiveTranslateLoop());
         }
 
         private static void OnProcessExit(object sender, EventArgs e)

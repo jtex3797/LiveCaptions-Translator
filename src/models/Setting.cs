@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿// Modified by jtex3797 (2026-11): TranslateOnSentenceEnd and LiveTranslation settings. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -20,6 +21,8 @@ namespace LiveCaptionsTranslator.models
         private int numContexts = 2;
         private int displaySentences = 1;
         private bool contextAware = false;
+        private bool translateOnSentenceEnd = true;
+        private bool liveTranslation = true;
 
         private string apiName;
         private string targetLanguage;
@@ -68,6 +71,25 @@ namespace LiveCaptionsTranslator.models
             {
                 contextAware = value;
                 OnPropertyChanged("ContextAware");
+            }
+        }
+        // Show a provisional translation of the sentence being spoken (overlay only, not logged).
+        public bool LiveTranslation
+        {
+            get => liveTranslation;
+            set
+            {
+                liveTranslation = value;
+                OnPropertyChanged("LiveTranslation");
+            }
+        }
+        public bool TranslateOnSentenceEnd
+        {
+            get => translateOnSentenceEnd;
+            set
+            {
+                translateOnSentenceEnd = value;
+                OnPropertyChanged("TranslateOnSentenceEnd");
             }
         }
 

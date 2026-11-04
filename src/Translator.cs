@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿// Modified by jtex3797 (2026-11): translate on sentence end, provisional live translation loop. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows.Automation;
@@ -106,6 +107,7 @@ namespace LiveCaptionsTranslator
 
                 // `OverlayOriginalCaption`: The sentence to be displayed on Overlay Window.
                 Caption.OverlayOriginalCaption = latestCaption;
+                Caption.OverlayLiveOriginal = latestCaption;
                 for (int historyCount = Math.Min(Setting.DisplaySentences, Caption.Contexts.Count);
                      historyCount > 0 && lastEOSIndex > 0;
                      historyCount--)
@@ -146,8 +148,17 @@ namespace LiveCaptionsTranslator
 
                 // `TranslateFlag` determines whether this sentence should be translated.
                 // When `OriginalCaption` remains unchanged, `idleCount` +1; when `OriginalCaption` changes, `MaxSyncInterval` +1.
-                if (syncCount > Setting.MaxSyncInterval ||
-                    idleCount == Setting.MaxIdleInterval)
+                // With `TranslateOnSentenceEnd`, unfinished sentences are not re-translated while the speaker
+                // keeps talking (this causes the translation to flicker). They are translated only when the
+                // sentence ends, the caption stays idle, or the text becomes too long without punctuation.
+                bool syncTrigger = syncCount > Setting.MaxSyncInterval &&
+                    (!Setting.TranslateOnSentenceEnd ||
+                     Encoding.UTF8.GetByteCount(Caption.OriginalCaption) >= TextUtil.LONG_THRESHOLD);
+                // A caption that merely pauses mid-sentence is translated later in this mode (2x idle time),
+                // because the sentence usually continues and the early translation would be replaced right away.
+                int idleLimit = Setting.TranslateOnSentenceEnd ? Setting.MaxIdleInterval * 2 : Setting.MaxIdleInterval;
+                if (syncTrigger ||
+                    idleCount == idleLimit)
                 {
                     syncCount = 0;
                     pendingTextQueue.Enqueue(Caption.OriginalCaption);
@@ -190,11 +201,142 @@ namespace LiveCaptionsTranslator
             }
         }
 
+        private static string[] SplitWords(string text)
+        {
+            return (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static void ClearLiveTranslation()
+        {
+            if (Caption == null)
+                return;
+            if (Caption.OverlayLiveTranslation.Length > 0)
+                Caption.OverlayLiveTranslation = string.Empty;
+            if (Caption.OverlayLiveTranslationSource.Length > 0)
+                Caption.OverlayLiveTranslationSource = string.Empty;
+        }
+
+        /// <summary>
+        /// Provisional translation for the overlay's live slot. Only the beginning of the sentence that did not change
+        /// between two consecutive polls (the "stable" words, like LocalAgreement) is translated, at a limited rate.
+        /// Nothing here is written to the history; the final translation still comes from `TranslateLoop`.
+        /// </summary>
+        public static async Task LiveTranslateLoop()
+        {
+            const int POLL_MS = 250;
+            const int MIN_WORDS = 3;
+            const int MIN_NEW_WORDS = 3;
+            const int MIN_INTERVAL_MS = 900;
+            const int MAX_WAIT_MS = 2000;
+
+            string previousHypothesis = string.Empty;
+            string requestedSource = string.Empty;
+            int unchangedPolls = 0;
+            int stableCount = 0;
+            int failures = 0;
+            DateTime lastRequest = DateTime.MinValue;
+            DateTime pausedUntil = DateTime.MinValue;
+
+            while (true)
+            {
+                await Task.Delay(POLL_MS);
+                try
+                {
+                    if (Setting == null || Caption == null)
+                        continue;
+                    if (!Setting.LiveTranslation || LogOnlyFlag || DateTime.UtcNow < pausedUntil)
+                    {
+                        ClearLiveTranslation();
+                        continue;
+                    }
+
+                    var words = SplitWords(Caption.OverlayLiveOriginal);
+                    string hypothesis = string.Join(" ", words);
+                    if (hypothesis.Length == 0)
+                    {
+                        previousHypothesis = string.Empty;
+                        requestedSource = string.Empty;
+                        stableCount = 0;
+                        ClearLiveTranslation();
+                        continue;
+                    }
+
+                    // Stable words: the common beginning of two consecutive different hypotheses (minus the last
+                    // word, which is the one the recognizer revises most often), or everything once it stopped changing.
+                    if (hypothesis == previousHypothesis)
+                    {
+                        if (++unchangedPolls >= 2)
+                            stableCount = words.Length;
+                    }
+                    else
+                    {
+                        unchangedPolls = 0;
+                        var previousWords = SplitWords(previousHypothesis);
+                        int common = 0;
+                        while (common < Math.Min(words.Length, previousWords.Length) &&
+                               string.Equals(words[common], previousWords[common], StringComparison.OrdinalIgnoreCase))
+                            common++;
+                        stableCount = Math.Max(0, common - 1);
+                        previousHypothesis = hypothesis;
+                    }
+
+                    // A finished sentence gets its final translation from `TranslateLoop`.
+                    if (Array.IndexOf(TextUtil.PUNC_EOS, hypothesis[^1]) != -1)
+                        continue;
+                    if (stableCount < MIN_WORDS)
+                        continue;
+
+                    string source = string.Join(" ", words.Take(stableCount));
+                    if (string.Equals(source, requestedSource, StringComparison.Ordinal))
+                        continue;
+
+                    var requestedWords = SplitWords(requestedSource);
+                    bool sameSentence = requestedWords.Length > 0 && requestedWords.Length <= stableCount &&
+                        requestedWords.SequenceEqual(words.Take(requestedWords.Length), StringComparer.OrdinalIgnoreCase);
+                    double sinceRequest = (DateTime.UtcNow - lastRequest).TotalMilliseconds;
+                    bool enoughNew = !sameSentence || stableCount - requestedWords.Length >= MIN_NEW_WORDS ||
+                        sinceRequest >= MAX_WAIT_MS;
+                    if (!enoughNew || sinceRequest < MIN_INTERVAL_MS)
+                        continue;
+
+                    lastRequest = DateTime.UtcNow;
+                    requestedSource = source;
+
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                    string translated = await TranslateAPI.TranslateFunction(source, cts.Token);
+                    translated = (translated ?? string.Empty).Replace("🔤", "").Trim();
+                    failures = 0;
+
+                    // Drop the result if the sentence has moved on in the meantime.
+                    var currentWords = SplitWords(Caption.OverlayLiveOriginal);
+                    int checkCount = Math.Min(Math.Min(6, currentWords.Length), stableCount);
+                    if (checkCount > 0 && currentWords.Take(checkCount).SequenceEqual(
+                            words.Take(checkCount), StringComparer.OrdinalIgnoreCase) &&
+                        translated.Length > 0)
+                    {
+                        Caption.OverlayLiveTranslationSource = source;
+                        Caption.OverlayLiveTranslation = translated;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Back off instead of hammering the translation service when it keeps failing.
+                    requestedSource = string.Empty;
+                    if (++failures >= 3)
+                    {
+                        failures = 0;
+                        pausedUntil = DateTime.UtcNow.AddSeconds(60);
+                        ClearLiveTranslation();
+                    }
+                }
+            }
+        }
+
         public static async Task DisplayLoop()
         {
             while (true)
             {
-                var (translatedText, isChoke) = translationTaskQueue.Output;
+                var (translatedText, isChoke, originalText) = translationTaskQueue.OutputWithOriginal;
 
                 if (LogOnlyFlag)
                 {
@@ -202,6 +344,7 @@ namespace LiveCaptionsTranslator
                     Caption.DisplayTranslatedCaption = "[Paused]";
                     Caption.OverlayNoticePrefix = "[Paused]";
                     Caption.OverlayCurrentTranslation = string.Empty;
+                    Caption.OverlayCurrentOriginal = string.Empty;
                 }
                 else if (!string.IsNullOrEmpty(RegexPatterns.NoticePrefix().Replace(
                              translatedText, string.Empty).Trim()) &&
@@ -213,6 +356,7 @@ namespace LiveCaptionsTranslator
                         TextUtil.ShortenDisplaySentence(Caption.TranslatedCaption, TextUtil.VERYLONG_THRESHOLD);
 
                     // Overlay window
+                    Caption.OverlayCurrentOriginal = originalText;
                     if (Caption.TranslatedCaption.Contains("[ERROR]") || Caption.TranslatedCaption.Contains("[WARNING]"))
                         Caption.OverlayCurrentTranslation = Caption.TranslatedCaption;
                     else

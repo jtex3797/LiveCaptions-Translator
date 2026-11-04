@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿// Modified by jtex3797 (2026-11): overlay live and provisional caption properties. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -18,6 +19,10 @@ namespace LiveCaptionsTranslator.models
         private string overlayOriginalCaption = " ";
         private string overlayCurrentTranslation = " ";
         private string overlayNoticePrefix = " ";
+        private string overlayCurrentOriginal = string.Empty;
+        private string overlayLiveOriginal = string.Empty;
+        private string overlayLiveTranslation = string.Empty;
+        private string overlayLiveTranslationSource = string.Empty;
 
         public string OriginalCaption { get; set; } = string.Empty;
         public string TranslatedCaption { get; set; } = string.Empty;
@@ -56,6 +61,46 @@ namespace LiveCaptionsTranslator.models
             {
                 overlayOriginalCaption = value;
                 OnPropertyChanged("OverlayOriginalCaption");
+            }
+        }
+        // Original text of the sentence shown in `OverlayCurrentTranslation`.
+        public string OverlayCurrentOriginal
+        {
+            get => overlayCurrentOriginal;
+            set
+            {
+                overlayCurrentOriginal = value;
+                OnPropertyChanged("OverlayCurrentOriginal");
+            }
+        }
+        // The sentence being spoken right now (not translated yet).
+        public string OverlayLiveOriginal
+        {
+            get => overlayLiveOriginal;
+            set
+            {
+                overlayLiveOriginal = value;
+                OnPropertyChanged("OverlayLiveOriginal");
+            }
+        }
+        // Provisional translation of the stable beginning of the sentence being spoken (never logged).
+        public string OverlayLiveTranslation
+        {
+            get => overlayLiveTranslation;
+            set
+            {
+                overlayLiveTranslation = value;
+                OnPropertyChanged("OverlayLiveTranslation");
+            }
+        }
+        // The source text that `OverlayLiveTranslation` was made from.
+        public string OverlayLiveTranslationSource
+        {
+            get => overlayLiveTranslationSource;
+            set
+            {
+                overlayLiveTranslationSource = value;
+                OnPropertyChanged("OverlayLiveTranslationSource");
             }
         }
         public string OverlayNoticePrefix

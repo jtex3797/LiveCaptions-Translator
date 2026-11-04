@@ -1,4 +1,5 @@
-﻿namespace LiveCaptionsTranslator.models
+﻿// Modified by jtex3797 (2026-11): expose the translated text together with its original. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+namespace LiveCaptionsTranslator.models
 {
     public class TranslationTaskQueue
     {
@@ -7,6 +8,20 @@
 
         private (string translatedText, bool isChoke) output;
         public (string translatedText, bool isChoke) Output => output;
+
+        // A reference-type snapshot, so that readers always see a consistent (translation, original) pair.
+        private sealed record OutputSnapshot(string TranslatedText, bool IsChoke, string Original);
+        private volatile OutputSnapshot? outputSnapshot;
+        public (string translatedText, bool isChoke, string original) OutputWithOriginal
+        {
+            get
+            {
+                var snapshot = outputSnapshot;
+                return snapshot == null ?
+                    (string.Empty, false, string.Empty) :
+                    (snapshot.TranslatedText, snapshot.IsChoke, snapshot.Original);
+            }
+        }
 
         public TranslationTaskQueue()
         {
@@ -40,6 +55,7 @@
             }
             
             output = translationTask.Task.Result;
+            outputSnapshot = new OutputSnapshot(output.translatedText, output.isChoke, translationTask.OriginalText);
             var translatedText = output.Item1;
             
             // Log after translation.
