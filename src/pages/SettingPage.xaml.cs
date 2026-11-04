@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿// Modified by jtex3797 (2026-11): guard against Live Captions window errors on show/hide. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -40,16 +41,24 @@ namespace LiveCaptionsTranslator
             var button = sender as Wpf.Ui.Controls.Button;
             var text = ButtonText.Text;
 
-            bool isHide = Translator.Window.Current.BoundingRectangle == Rect.Empty;
-            if (isHide)
+            try
             {
-                LiveCaptionsHandler.RestoreLiveCaptions(Translator.Window);
-                ButtonText.Text = "Hide";
+                bool isHide = Translator.Window.Current.BoundingRectangle == Rect.Empty;
+                if (isHide)
+                {
+                    LiveCaptionsHandler.RestoreLiveCaptions(Translator.Window);
+                    ButtonText.Text = "Hide";
+                }
+                else
+                {
+                    LiveCaptionsHandler.HideLiveCaptions(Translator.Window);
+                    ButtonText.Text = "Show";
+                }
             }
-            else
+            catch (System.Windows.Automation.ElementNotAvailableException)
             {
-                LiveCaptionsHandler.HideLiveCaptions(Translator.Window);
-                ButtonText.Text = "Show";
+                // LiveCaptions was closed or crashed. Drop the stale handle so that `TranslateLoop` relaunches it.
+                Translator.Window = null;
             }
         }
 

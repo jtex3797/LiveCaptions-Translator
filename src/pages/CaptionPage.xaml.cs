@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿// Modified by jtex3797 (2026-11): card height and auto height adjustments. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0).
+using System.ComponentModel;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,7 +11,7 @@ namespace LiveCaptionsTranslator
 {
     public partial class CaptionPage : Page
     {
-        public const int CARD_HEIGHT = 110;
+        public const int CARD_HEIGHT = 95;
 
         private static CaptionPage instance;
         public static CaptionPage Instance => instance;
@@ -94,8 +95,7 @@ namespace LiveCaptionsTranslator
         {
             if (Translator.Setting.MainWindow.CaptionLogEnabled)
                 (App.Current.MainWindow as MainWindow).AutoHeightAdjust(
-                    minHeight: CARD_HEIGHT * (Translator.Setting.DisplaySentences + 1),
-                    maxHeight: CARD_HEIGHT * (Translator.Setting.DisplaySentences + 1));
+                    minHeight: CARD_HEIGHT * (Translator.Setting.DisplaySentences + 1));
             else
                 (App.Current.MainWindow as MainWindow).AutoHeightAdjust(
                     minHeight: (int)App.Current.MainWindow.MinHeight,

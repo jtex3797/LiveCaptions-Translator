@@ -1,4 +1,5 @@
-﻿<Page
+﻿<!-- Modified by jtex3797 (2026-11): sentence-separated log cards and a scrollable page. Derived from SakiRinn/LiveCaptions-Translator (Apache-2.0). -->
+<Page
     x:Class="LiveCaptionsTranslator.CaptionPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -10,6 +11,7 @@
     JournalEntry.KeepAlive="True"
     mc:Ignorable="d">
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid Margin="5,5,15,5">
         <Grid.RowDefinitions>
             <RowDefinition x:Name="OriginalCaption_Row" Height="Auto" />
@@ -71,46 +73,32 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border
-                            Margin="0,0,0,5"
-                            Padding="10,5,10,5"
-                            BorderBrush="#20000000"
-                            BorderThickness="0,1,0,0">
-                            <Grid Grid.Row="0">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-
-                                <ui:Card
-                                    Grid.Row="0"
-                                    Padding="8"
-                                    VerticalAlignment="Stretch">
-                                    <TextBlock
-                                        x:Name="OriginalCaptionLog"
-                                        Background="Transparent"
-                                        Cursor="Hand"
-                                        FontSize="12"
-                                        MouseLeftButtonDown="TextBlock_MouseLeftButtonDown"
-                                        Style="{StaticResource CaptionBlockStyle}"
-                                        Text="{Binding SourceText}"
-                                        ToolTip="Click To Copy" />
-                                </ui:Card>
-                                <ui:Card
-                                    Grid.Row="1"
+                            Margin="0,0,0,4"
+                            Padding="10,7,10,8"
+                            BorderBrush="#30808080"
+                            BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock
+                                    Background="Transparent"
+                                    Cursor="Hand"
+                                    FontSize="17"
+                                    FontWeight="SemiBold"
+                                    LineHeight="24"
+                                    MouseLeftButtonDown="TextBlock_MouseLeftButtonDown"
+                                    Style="{StaticResource CaptionBlockStyle}"
+                                    Text="{Binding TranslatedText}"
+                                    ToolTip="Click To Copy" />
+                                <TextBlock
                                     Margin="0,3,0,0"
-                                    Padding="8"
-                                    VerticalAlignment="Stretch">
-                                    <TextBlock
-                                        x:Name="TranslatedCaptionLog"
-                                        Background="Transparent"
-                                        Cursor="Hand"
-                                        FontSize="16"
-                                        MouseLeftButtonDown="TextBlock_MouseLeftButtonDown"
-                                        Style="{StaticResource CaptionBlockStyle}"
-                                        Text="{Binding TranslatedText}"
-                                        ToolTip="Click To Copy" />
-                                </ui:Card>
-                            </Grid>
+                                    Background="Transparent"
+                                    Cursor="Hand"
+                                    FontSize="12"
+                                    MouseLeftButtonDown="TextBlock_MouseLeftButtonDown"
+                                    Opacity="0.6"
+                                    Style="{StaticResource CaptionBlockStyle}"
+                                    Text="{Binding SourceText}"
+                                    ToolTip="Click To Copy" />
+                            </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -118,4 +106,5 @@
         </ui:Card>
 
     </Grid>
+    </ScrollViewer>
 </Page>

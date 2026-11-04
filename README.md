@@ -18,6 +18,39 @@
 
 </div>
 
+## About this fork
+
+This is an **unofficial fork** of [SakiRinn/LiveCaptions-Translator](https://github.com/SakiRinn/LiveCaptions-Translator),
+based on upstream commit `d6d8394`. It is not affiliated with or endorsed by the original author.
+It is distributed under the same license (Apache License 2.0, see [LICENSE](LICENSE)); modified source files carry a change notice.
+
+The goal of this fork is **readability** when following a meeting or a video in real time.
+
+### What changed
+
+- **Translate on sentence end** - a sentence is translated once it is finished (or after a pause) instead of on every caption update, so the translation stops flickering.
+- **Sentence pairs in the overlay** - several finished sentences are shown as *translation, then original*, newest at the bottom; older ones scroll up and fade out at the top.
+- **Fixed-height live slot** - the sentence being spoken has its own slot with a fixed size (2 lines translation + 2 lines original). The last two words of the original are dimmed because the recognizer revises them most often, and the provisional translation fades in instead of jumping.
+- **Provisional translation (experimental)** - only the beginning of the sentence that stayed unchanged between two consecutive polls is translated, at a limited rate. It is shown in the overlay only and is never written to the history.
+- **Home page log cards** - one card per sentence (translation, then original) in a scrollable page.
+- **Overlay minimum height** follows the font size so the live slot is never cut off, and the hover buttons sit at the top right.
+- **Crash guard** - the Show/Hide Live Captions button no longer crashes the app when the Live Captions window is unavailable.
+
+### New settings (`setting.json`)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `TranslateOnSentenceEnd` | `true` | Translate when a sentence ends or after a pause (`false` restores the upstream behavior). |
+| `LiveTranslation` | `true` | Show the provisional translation. It sends an extra translation request about once per second while someone is speaking; set `false` to disable it. After 3 consecutive failures it pauses itself for 60 seconds. |
+
+### Build
+
+```
+dotnet publish LiveCaptionsTranslator.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Platform=AnyCPU -o ./publish
+```
+
+No pre-built binaries are provided. For the official releases, see the [upstream releases](https://github.com/SakiRinn/LiveCaptions-Translator/releases).
+
 ## Overview
 
 **✨ LiveCaptions Translator = Windows LiveCaptions + Translate API ✨**
